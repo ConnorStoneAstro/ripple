@@ -1,5 +1,8 @@
-from multiplane_core import LensPlane, SourcePlane, ImagePlane
-from multiplane import SIE_Lens, Gaussian_Source
+import sys
+sys.path.append("/home/connor/Programming/ripple/")
+from ripple.plane import LensPlane, SourcePlane, ImagePlane
+from ripple.lens import SIE_Lens
+from ripple.source import Gaussian_Source
 import numpy as np
 import matplotlib.pyplot as plt
 
