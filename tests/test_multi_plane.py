@@ -3,6 +3,7 @@ sys.path.append("/home/connor/Programming/ripple/")
 from ripple.plane import LensPlane, SourcePlane, ImagePlane, MultiLensPlane
 from ripple.lens import SIE_Lens
 from ripple.source import Gaussian_Source
+from ripple.plot import caustics, critical_lines
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -32,7 +33,7 @@ plt.title("alpha 1")
 plt.show()
 plt.imshow(IP.image(LP,SP), extent = IP.plt_extent, origin = "lower")
 plt.colorbar()
-# LP.caustics(plt.gca())
+# caustics(LP, plt.gca())
 plt.title("multi lens")
 # plt.savefig("multilens.jpg", dpi = 400)
 plt.show()
@@ -47,7 +48,7 @@ IP = ImagePlane(shape = (1001, 1001), fov = (10,10), z = 0)
 
 plt.imshow(IP.image(MLP,SP), extent = IP.plt_extent, origin = "lower")
 plt.colorbar()
-#LP.caustics(plt.gca())
+#caustics(LP, plt.gca())
 plt.title(f"multi plane, z = 0.5 and 1")
 # plt.savefig(f"multiplane.jpg", dpi = 400)
 # plt.close()
@@ -63,7 +64,7 @@ plt.show()
 
 #     plt.imshow(IP.image(MLP,SP), extent = IP.plt_extent, origin = "lower")
 #     plt.colorbar()
-#     #LP.caustics(plt.gca())
+#     #caustics(LP, plt.gca())
 #     plt.title(f"multi plane, z = {z:.2f}")
 #     plt.savefig(f"multiplanevid/multiplane_{i:03d}.jpg", dpi = 400)
 #     plt.close()

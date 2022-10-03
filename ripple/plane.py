@@ -3,6 +3,7 @@ from .core import BasePlane, BaseMultiPlane, BaseLens, BaseSource
 
 class SourcePlane(BasePlane):
     def __init__(self, sources, **kwargs):
+        kwargs["z"] = kwargs.get("z", 2.)
         super().__init__(**kwargs)
         self.sources = sources
         
@@ -11,6 +12,7 @@ class SourcePlane(BasePlane):
     
 class LensPlane(BasePlane):
     def __init__(self, lenses, **kwargs):
+        kwargs["z"] = kwargs.get("z", 1.)
         super().__init__(**kwargs)
         self.lenses = lenses
 
@@ -32,43 +34,10 @@ class LensPlane(BasePlane):
     def project_ray_mesh(self, X, Y, image, source):
         alpha = self.alpha(X, Y)
         return np.array([X - alpha[0], Y - alpha[1]])    
-
-    def critical_lines(self, ax, show = True, resolution = 1000, fov = 2., **kwargs):
-        if isinstance(resolution, int):
-            resolution = (resolution, resolution)
-        if isinstance(fov, float):
-            fov = (fov, fov)
-        contour_params = {
-            "colors": "r",
-            "linestyles": "--",
-            "extent": (-fov[1]*self.einstein_radius, fov[1]*self.einstein_radius,-fov[0]*self.einstein_radius, fov[0]*self.einstein_radius)
-        }
-        contour_params.update(kwargs)
-        XX, YY = np.meshgrid(np.linspace(contour_params["extent"][0], contour_params["extent"][1], resolution[1]), np.linspace(contour_params["extent"][2], contour_params["extent"][3], resolution[0]))
-        CS = ax.contour(self.detA(XX, YY), levels = [0.0], **contour_params)
-        return CS
-    
-    def caustics(self, ax, show = True, cl_kwargs = {}, **kwargs):
-        cl = self.critical_lines(ax, **cl_kwargs)
-        paths = cl.collections[0].get_paths()
-        if len(paths) == 0:
-            return
-        for path in paths:
-            vertices = path.interpolated(5).vertices
-            x1 = np.array(list(float(vs[0]) for vs in vertices))
-            x2 = np.array(list(float(vs[1]) for vs in vertices))
-            
-            a = self.alpha(x1, x2)
-            y1 = x1 - a[0]
-            y2 = x2 - a[1]
-            caustic_params = {"color": "b", "linestyle": "-"}
-            if path is paths[0]:
-                caustic_params["label"] = "causitcs"
-            caustic_params.update(kwargs)
-            ax.plot(y1, y2, **caustic_params)
         
 class ImagePlane(BasePlane):
     def __init__(self, shape, fov = None, pixelscale = None, **kwargs):
+        kwargs["z"] = kwargs.get("z", 0.)
         super().__init__(**kwargs)
         assert (fov is not None) or (pixelscale is not None), "one of fov or pixelscale must be given"
         
@@ -96,7 +65,7 @@ class ImagePlane(BasePlane):
         return self._fov
     @fov.setter
     def fov(self, value):
-        if isinstance(value, float):
+        if isinstance(value, float) or isinstance(value, int):
             self._fov = np.array((value, value))
         else:
             self._fov = np.array(value)

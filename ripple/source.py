@@ -1,6 +1,10 @@
 import numpy as np
 from .core import coordinate_transform, BaseSource
-        
+from scipy.interpolate import RectBivariateSpline
+
+class Null_Source(BaseSource):
+    pass
+
 class Gaussian_Source(BaseSource):
     default_params = {"q": 1., "pa": 0., "norm": 1., "x0": 0., "y0": 0., "sigma": 1.}
     @coordinate_transform

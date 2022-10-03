@@ -133,9 +133,9 @@ class BaseSource(Universe):
         return np.zeros(X.shape)
     
 class BasePlane(Universe):
-    def __init__(self, z = 0., **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.z = z
+        self.z = kwargs.get("z", 0.)
     
     def D(self, plane):
         return self.dM(self.z, plane.z)

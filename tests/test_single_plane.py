@@ -3,6 +3,7 @@ sys.path.append("/home/connor/Programming/ripple/")
 from ripple.plane import LensPlane, SourcePlane, ImagePlane
 from ripple.lens import SIE_Lens
 from ripple.source import Gaussian_Source
+from ripple.plot import caustics, critical_lines
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -32,7 +33,7 @@ plt.show()
 
 plt.imshow(IP.image(LP,SP), extent = IP.plt_extent, origin = "lower")
 plt.colorbar()
-LP.caustics(plt.gca())
+caustics(LP, plt.gca())
 plt.title("super basic lens")
 plt.show()
 
@@ -62,6 +63,6 @@ plt.title("alpha 1")
 plt.show()
 plt.imshow(IP.image(LP,SP), extent = IP.plt_extent, origin = "lower")
 plt.colorbar()
-LP.caustics(plt.gca())
+caustics(LP, plt.gca())
 plt.title("multi lens")
 plt.show()

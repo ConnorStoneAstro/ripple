@@ -1,6 +1,9 @@
 import numpy as np
 from .core import coordinate_transform, coordinate_transform_gradient, coordinate_transform_laplacian, BaseLens
 
+class Null_Lens(BaseLens):
+    pass
+
 class SIE_Lens(BaseLens):
     default_params = {"q": 1., "pa": 0., "norm": 1., "x0": 0., "y0": 0., "core": 0.}
     
