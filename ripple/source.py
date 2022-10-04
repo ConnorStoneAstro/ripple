@@ -10,6 +10,19 @@ class Gaussian_Source(BaseSource):
     @coordinate_transform
     def __call__(self, X, Y):
         return (self["norm"] / (np.sqrt(np.pi)*self["sigma"])) * np.exp(-0.5*(X**2 + Y**2)/self["sigma"]**2)
+
+class Exponential_Source(BaseSource):
+    default_params = {"q": 1., "pa": 0., "I0": 1., "x0": 0., "y0": 0., "Rs": 1.}
+    @coordinate_transform
+    def __call__(self, X, Y):
+        return self["I0"] * np.exp(-np.sqrt(X**2 + Y**2)/self["Rs"])
+
+class Sersic_Source(BaseSource):
+    default_params = {"q": 1., "pa": 0., "Ie": 1., "x0": 0., "y0": 0., "Re": 1., "n": 2.}
+    @coordinate_transform
+    def __call__(self, X, Y):
+        bn = 2*self["n"] - 1/3 + 4/(405*self["n"]) + 46 / (25515*self["n"]**2) + 131 / (1148175*self["n"]**3) - 2194697 / (30690717750*self["n"]**4)
+        return self["Ie"] * np.exp(-bn * ((np.sqrt(X**2 + Y**2)/self["Rs"])**(1/self["n"]) - 1))
     
 class Image_Source(BaseSource):
     default_params = {"norm": 1.}

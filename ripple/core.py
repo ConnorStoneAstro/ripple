@@ -136,13 +136,44 @@ class BasePlane(Universe):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.z = kwargs.get("z", 0.)
-    
+
     def D(self, plane):
         return self.dM(self.z, plane.z)
             
 class BaseMultiPlane(Universe):
     def __init__(self, planes, **kwargs):
         super().__init__(**kwargs)
-        self.planes = planes
+        self.planes = []
+        for plane in planes:
+            self.add(plane)
         
+    def add(self, plane):
+
+        if len(self.planes) == 0:
+            self.planes = [plane]
+            return
+
+        if plane.z < self.planes[0].z:
+            self.planes.insert(0, plane)
+        elif plane.z > self.planes[-1].z:
+            self.planes.append(plane)
+        else:
+            for i in range(len(self.planes)-1):
+                if self.planes[i].z < plane.z < self.planes[i+1].z:
+                    self.planes.insert(i+1,plane)
+                    break
+    def remove(self, plane):
+        if isinstance(plane, int):
+            self.planes.pop(0)
+            return
+        for i in range(len(self.planes)):
+            if plane is self.planes[i]:
+                self.planes.pop(i)
+                return
+
+    def __len__(self):
+        return len(self.planes)
+    def __iter__(self):
+        return self.planes.__iter__()
+            
         
