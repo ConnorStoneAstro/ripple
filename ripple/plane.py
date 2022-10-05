@@ -1,5 +1,6 @@
 import numpy as np
 from .core import BasePlane, BaseMultiPlane, BaseLens, BaseSource
+from copy import deepcopy
 
 class SourcePlane(BasePlane):
     def __init__(self, sources, **kwargs):
@@ -86,23 +87,28 @@ class ImagePlane(BasePlane):
 class MultiLensPlane(BaseMultiPlane):
     def __init__(self, planes, **kwargs):
         super().__init__(planes, **kwargs)
-
-    def alpha_recursive(self, Xim1, Xi, image, source, i = 0, keep_alpha = False, alphas = []):
-        if i == len(self.planes):
+        self._recursive_alphas = []
+        self._recursive_i = 0
+        
+    def alpha_recursive(self, Xim1, Xi, image, source, keep_alpha = False):
+        if self._recursive_i == len(self.planes):
+            self._recursive_i = 0
             if keep_alpha:
-                return alphas
+                tosend = deepcopy(self._recursive_alphas)
+                self._recursive_alphas = []
+                return tosend
             else:
                 return Xi
-        
-        Dim1i = self.dM(image.z if i == 0 else self.planes[i-1].z, self.planes[i].z)
-        Diip1 = self.dM(self.planes[i].z, self.planes[i+1].z if len(self.planes) > (i+1) else source.z)
-        D0i = self.dM(image.z, self.planes[i].z)
-        D = self.dM(image.z, source.z) / self.dM(self.planes[i].z, source.z)
-        Xip1 = (Diip1 / Dim1i + 1) * Xi - (Diip1 / Dim1i) * Xim1 - Diip1 * D * self.planes[i].alpha(Xi[0]/D0i, Xi[1]/D0i)
-
+            
+        Dim1i = self.dM(image.z if self._recursive_i == 0 else self.planes[self._recursive_i-1].z, self.planes[self._recursive_i].z)
+        Diip1 = self.dM(self.planes[self._recursive_i].z, self.planes[self._recursive_i+1].z if len(self.planes) > (self._recursive_i+1) else source.z)
+        D0i = self.dM(image.z, self.planes[self._recursive_i].z)
+        D = self.dM(image.z, source.z) / self.dM(self.planes[self._recursive_i].z, source.z)
+        Xip1 = (Diip1 / Dim1i + 1) * Xi - (Diip1 / Dim1i) * Xim1 - Diip1 * D * self.planes[self._recursive_i].alpha(Xi[0]/D0i, Xi[1]/D0i)
         if keep_alpha:
-            alphas.append(Xip1 / self.dM(image.z, source.z))
-        return self.alpha_recursive(Xi, Xip1, image, source, i + 1, keep_alpha, alphas)
+            self._recursive_alphas.append(Xip1 / self.dM(image.z, source.z))
+        self._recursive_i += 1
+        return self.alpha_recursive(Xi, Xip1, image, source, keep_alpha)
             
     def project_ray_mesh(self, X, Y, image, source):
         theta = self.alpha_recursive(0., self.dM(image.z, self.planes[0].z) * np.array([X, Y]), image, source) / self.dM(image.z, source.z)
