@@ -226,7 +226,7 @@ def rays_3D_multiplane(imageplane, multilensplane, sourceplane, ax3d, units = "a
             facecolors = cmap(kappa/np.max(kappa)), zorder = (2*len(multilensplane) - 2*ilp) if face_forward else (2 + 2*ilp), **surface_kwargs
         )
 
-    alphas = multilensplane.alpha_recursive(0., multilensplane.dM(imageplane.z, multilensplane.planes[0].z) * np.array([samplesX, samplesY]), imageplane, sourceplane, keep_alpha = True)
+    alphas = multilensplane.alpha_recursive(0., multilensplane.dM(imageplane.z, multilensplane.planes[0].z) * np.array([samplesX, samplesY]), imageplane, sourceplane, alphas = [])
     
     # Plot the rays
     Dlens = imageplane.dM(0, multilensplane.planes[0].z)

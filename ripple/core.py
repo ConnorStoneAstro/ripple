@@ -5,6 +5,18 @@ import functools
 import matplotlib.pyplot as plt
 from scipy.integrate import quad
 
+def coordinate_shift(func):
+    @functools.wraps(func)
+    def wrap_coordinate_shift(self, X, Y, *args, **kwargs):
+        return func(self, X - self["x0"], Y - self["y0"], *args, **kwargs)
+    return wrap_coordinate_shift
+def coordinate_rotate(func):
+    @functools.wraps(func)
+    def wrap_coordinate_shift(self, X, Y, *args, **kwargs):
+        XX, YY = Rotate_Cartesian(X, Y, self["pa"])
+        return func(self, XX, YY, *args, **kwargs)
+    return wrap_coordinate_shift
+
 def coordinate_transform(func):
     @functools.wraps(func)
     def wrap_coordinate_transform(self, X, Y, *args, **kwargs):
@@ -35,7 +47,11 @@ def _Edzt(z, Omega_r, Omega_m, Omega_k, Omega_L):
     return 1 / ((1+z)*np.sqrt(Omega_r*(1+z)**4 + Omega_m*(1+z)**3 + Omega_k*(1+z)**2 + Omega_L*(1+z)))
 
 class Universe(object):
-    cosmology = {"Omega_r": 0., "Omega_m": 0.321, "Omega_L": 0.679, "c": 299792.458, "H0": 73.}
+    cosmology = {"Omega_r": 0., "Omega_m": 0.321, "Omega_L": 0.679,
+                 "c": 299792.458, # km / s
+                 "H0": 73., # km / s / Mpc
+                 "G": 4.30091e-9 # Mpc km^2 / s^2 / Msun
+    }
     def __init__(self, **kwargs):
         for key in kwargs:
             if key in Universe.cosmology:
