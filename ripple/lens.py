@@ -1,5 +1,5 @@
 import numpy as np
-from .core import coordinate_transform, coordinate_transform_gradient, coordinate_transform_laplacian, BaseLens, coordinate_shift, coordinate_rotate
+from .core import coordinate_transform, coordinate_transform_gradient, coordinate_transform_laplacian, BaseLens, coordinate_shift, coordinate_rotate, coordinate_rotate_rev
 from astropy.convolution import convolve_fft, convolve
 from scipy.interpolate import RectBivariateSpline
 from scipy.integrate import dblquad
@@ -7,8 +7,62 @@ from scipy.integrate import dblquad
 class Null_Lens(BaseLens):
     pass
 
+class PointMass_Lens(BaseLens):
+    default_params = {"x0": 0., "y0": 0., "norm": 1.}
+
+    @property
+    def mass(self):
+        return self["norm"]
+    
+    @coordinate_shift
+    def _gradient(self, X, Y):
+        return - self["norm"] * np.array([X, Y]) / (X**2 + Y**2)
+
+    @coordinate_shift
+    def _laplacian(self, X, Y):
+        r2 = X**2 + Y**2
+        psi12 = 2 * X * Y 
+        return self["norm"] * np.array(((Y**2 - X**2, psi12),(psi12, X**2 - Y**2))) / r2**2
+        
+    @coordinate_shift
+    def potential(self, X, Y):
+        return self["norm"] * np.log(np.sqrt(X**2 + Y**2))
+
+class PowerLawPotential_Lens(BaseLens):
+    default_params = {"q": 1., "pa": 0., "norm": 1., "x0": 0., "y0": 0., "alpha": 1.}
+
+    @coordinate_transform_gradient
+    def _gradient(self, X, Y):
+        pass
+    
+    @coordinate_transform_laplacian
+    def _laplacian(self, X, Y):
+        pass
+    
+    @coordinate_transform
+    def potential(self, X, Y):
+        return self["norm"] * (X**2 + (Y/self["q"])**2 + self["core"]**2)**(self["alpha"]/2) - self["norm"]*self["core"]**self["alpha"]
+    
+class PowerLawDensity_Lens(BaseLens):
+    default_params = {"q": 1., "pa": 0., "norm": 1., "x0": 0., "y0": 0., "alpha": 1.}
+
+    @coordinate_transform_gradient
+    def _gradient(self, X, Y):
+        pass
+    
+    @coordinate_transform_laplacian
+    def _laplacian(self, X, Y):
+        pass
+    
+    @coordinate_transform
+    def potential(self, X, Y):
+        pass
+    
+    def kappa(self, X, Y):
+        return (self["norm"]**(2-self["alpha"])) / (2 * (self["core"]**2 + X**2 + (Y/self["q"])**2)**(1 - self["alpha"]/2))
+
 class SIS_Lens(BaseLens):
-    default_params = {"norm": 1., "x0": 0., "y0": 0., "core": 0.}
+    default_params = {"norm": 1., "x0": 0., "y0": 0.}
 
     @property
     def mass(self):
@@ -16,32 +70,35 @@ class SIS_Lens(BaseLens):
 
     @coordinate_shift
     def _gradient(self, X, Y):
-        r = np.sqrt(X**2 + Y**2 + self["core"]**2)
+        r = np.sqrt(X**2 + Y**2)
         return self["norm"] * np.array((X/r, Y/r))
 
     @coordinate_shift
     def _laplacian(self, X, Y):
-        r3 = np.sqrt(X**2 + Y**2 + self["core"]**2)**3
+        r3 = np.sqrt(X**2 + Y**2)**3
         psi12 = -X*Y/r3
         return self["norm"] * np.array(((Y**2 / r3, psi12),(psi12, X**2 / r3)))
 
     @coordinate_shift
     def potential(self, X, Y):
-        return self["norm"] * np.sqrt(X**2 + Y**2 + self["core"]**2)
+        return self["norm"] * np.sqrt(X**2 + Y**2)
 
 class SIE_Lens(BaseLens):
-    default_params = {"q": 1., "pa": 0., "norm": 1., "x0": 0., "y0": 0., "core": 0.}
+    default_params = {"q": 0.9, "pa": 0., "norm": 1., "x0": 0., "y0": 0.}
     # See https://articles.adsabs.harvard.edu/pdf/1994A%26A...284..285K
     # Kornmann et al. 1993
+    # maybe try: https://arxiv.org/pdf/astro-ph/0102341v2.pdf
     
     @property
     def mass(self):
         return self["norm"]
     
     @coordinate_shift
-    @coordinate_rotate
+    @coordinate_rotate_rev
     def _gradient(self, X, Y):
         qprime = np.sqrt(1 - self["q"]**2)
+        # psi = np.sqrt(self["q"]*(self["core"]**2 + X**2) + Y**2)
+        # return self["norm"] * self["q"] * np.array((np.arctan(qprime * X / (self["core"] + psi)), np.arctanh(qprime * Y / (self["q"]**2 * self["core"] + psi)))) / qprime
         theta = np.arctan2(Y, X)
         return self["norm"] * np.sqrt(self["q"]) * np.array((
             np.arcsinh(qprime * np.cos(theta) / self["q"]),
@@ -51,23 +108,139 @@ class SIE_Lens(BaseLens):
     @coordinate_shift
     @coordinate_rotate
     def _laplacian(self, X, Y):
-        r = np.sqrt(X**2 + (self["q"]*Y)**2 + self["core"]**2)
+        r = np.sqrt(X**2 + (self["q"]*Y)**2)
         kappa = np.sqrt(self["q"]) / (2 * r)
         theta = np.arctan2(Y, X)
         psi12 = kappa * np.sin(2*theta)
         return self["norm"] * np.array(((2 * kappa * np.sin(theta)**2, psi12),(psi12, 2 * kappa * np.cos(theta)**2)))
+
+    @coordinate_shift
+    @coordinate_rotate
+    def kappa(self, X, Y):
+        r = np.sqrt(X**2 + (self["q"]*Y)**2)
+        return self["norm"] * np.sqrt(self["q"]) / (2 * r)
+
+    @coordinate_shift
+    @coordinate_rotate
+    def detA(self, X, Y):
+        kappa = np.sqrt(self["q"]) / (2 * np.sqrt(X**2 + (self["q"]*Y)**2))
+        return 1 - 2 * self["norm"] * kappa
         
+    @coordinate_shift
+    @coordinate_rotate
+    def gamma(self, X, Y):
+        theta = np.arctan2(Y, X)
+        kappa = np.sqrt(self["q"]) / (2 * np.sqrt(X**2 + (self["q"]*Y)**2))
+        return -self["norm"] * kappa * np.array((np.cos(2*theta), np.sin(2*theta)))
+    
     @coordinate_shift
     @coordinate_rotate
     def potential(self, X, Y):
         qprime = np.sqrt(1 - self["q"]**2)
-        r = np.sqrt(X**2 + Y**2 + self["core"]**2)
+        r = np.sqrt(X**2 + (self["q"]*Y)**2)
         theta = np.arctan2(Y, X)
         term1 = np.sqrt(self["q"]) * r / qprime
         term2 = np.sin(theta) * np.arcsin(qprime * np.sin(theta)) + np.cos(theta) * np.arcsinh(qprime * np.cos(theta) / self["q"])
         return self["norm"] * term1 * term2
     
 
+class NIS_Lens(BaseLens):
+    default_params = {"norm": 1., "x0": 0., "y0": 0., "core": 0.}
+
+    @property
+    def mass(self):
+        return self["norm"]
+
+    @coordinate_shift
+    def _gradient(self, X, Y):
+        r2 = X**2 + Y**2
+        m = np.sqrt(X**2 + Y**2 + self["core"]**2)
+        return self["norm"] * m * np.array((X, Y)) / r2
+
+    @coordinate_shift
+    def _laplacian(self, X, Y):
+        r2 = X**2 + Y**2
+        rc = np.sqrt(X**2 + Y**2 + self["core"]**2)
+        psi11 = Y**4 + (self["core"]**2 + 1)*Y**2 + (1 - self["core"])*X**2 + self["core"] * (X**2 - Y**2) * rc
+        psi22 = X**4 + (self["core"]**2 + 1)*X**2 + (1 - self["core"])*Y**2 + self["core"] * (Y**2 - X**2) * rc
+        psi12 = - X * Y * (r2 + 2*self["core"]**2 - 2*self["core"]*rc)
+        return self["norm"] * np.array(((psi11, psi12),(psi12, psi22))) / (r2 * rc)
+
+    @coordinate_shift
+    def kappa(self, X, Y):
+        return self["norm"] / (2 * np.sqrt(X**2 + Y**2 + self["core"]**2))
+    
+    @coordinate_shift
+    def potential(self, X, Y):
+        r = np.sqrt(X**2 + Y**2 + self["core"]**2)
+        return self["norm"] * (r - self["core"]*np.log(self["core"] + r))
+
+class NIE_Lens(BaseLens):
+    default_params = {"q": 0.9, "pa": 0., "norm": 1., "x0": 0., "y0": 0., "core": 0.1}
+    # See https://articles.adsabs.harvard.edu/pdf/1994A%26A...284..285K
+    # Kornmann et al. 1993
+    # maybe try: https://arxiv.org/pdf/astro-ph/0102341v2.pdf
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if kwargs.get("do_warn", True):
+            print("WARNING: currently only kappa works for NIE, otherwise its jst an SIE")
+    
+    @property
+    def mass(self):
+        return self["norm"]
+    
+    @coordinate_shift
+    @coordinate_rotate_rev
+    def _gradient(self, X, Y):
+        qprime = np.sqrt(1 - self["q"]**2)
+        # psi = np.sqrt(self["q"]*(self["core"]**2 + X**2) + Y**2)
+        # return self["norm"] * self["q"] * np.array((np.arctan(qprime * X / (self["core"] + psi)), np.arctanh(qprime * Y / (self["q"]**2 * self["core"] + psi)))) / qprime
+        theta = np.arctan2(Y, X)
+        return self["norm"] * np.sqrt(self["q"]) * np.array((
+            np.arcsinh(qprime * np.cos(theta) / self["q"]),
+            np.arcsin(qprime * np.sin(theta)),
+        )) / qprime
+
+    @coordinate_shift
+    @coordinate_rotate
+    def _laplacian(self, X, Y):
+        r = np.sqrt(X**2 + (self["q"]*Y)**2)
+        kappa = np.sqrt(self["q"]) / (2 * r)
+        theta = np.arctan2(Y, X)
+        psi12 = kappa * np.sin(2*theta)
+        return self["norm"] * np.array(((2 * kappa * np.sin(theta)**2, psi12),(psi12, 2 * kappa * np.cos(theta)**2)))
+
+    @coordinate_shift
+    @coordinate_rotate
+    def kappa(self, X, Y):
+        r = np.sqrt(X**2 + (self["q"]*Y)**2 + self["core"]**2)
+        return self["norm"] * np.sqrt(self["q"]) / (2 * r)
+
+    @coordinate_shift
+    @coordinate_rotate
+    def detA(self, X, Y):
+        kappa = np.sqrt(self["q"]) / (2 * np.sqrt(X**2 + (self["q"]*Y)**2))
+        return 1 - 2 * self["norm"] * kappa
+        
+    @coordinate_shift
+    @coordinate_rotate
+    def gamma(self, X, Y):
+        theta = np.arctan2(Y, X)
+        kappa = np.sqrt(self["q"]) / (2 * np.sqrt(X**2 + (self["q"]*Y)**2))
+        return -self["norm"] * kappa * np.array((np.cos(2*theta), np.sin(2*theta)))
+    
+    @coordinate_shift
+    @coordinate_rotate
+    def potential(self, X, Y):
+        qprime = np.sqrt(1 - self["q"]**2)
+        r = np.sqrt(X**2 + (self["q"]*Y)**2)
+        theta = np.arctan2(Y, X)
+        term1 = np.sqrt(self["q"]) * r / qprime
+        term2 = np.sin(theta) * np.arcsin(qprime * np.sin(theta)) + np.cos(theta) * np.arcsinh(qprime * np.cos(theta) / self["q"])
+        return self["norm"] * term1 * term2
+    
+    
 class Gaussian_Lens(BaseLens):
     default_params = {"q": 1., "pa": 0., "norm": 1., "x0": 0., "y0": 0., "sigma": 1.}
 
@@ -84,28 +257,7 @@ class Gaussian_Lens(BaseLens):
     @coordinate_transform
     def potential(self, X, Y):
         return (self["norm"] / (np.sqrt(np.pi)*self["sigma"])) * np.exp(-0.5*(X**2 + Y**2)/self["sigma"]**2)
-
-class PointMass_Lens(BaseLens):
-    default_params = {"x0": 0., "y0": 0., "mass": 1.}
-
-    @property
-    def mass(self):
-        return self["mass"]
     
-    @coordinate_shift
-    def _gradient(self, X, Y):
-        return - self["mass"] * np.array([X, Y]) / (X**2 + Y**2)
-
-    @coordinate_shift
-    def _laplacian(self, X, Y):
-        r2 = X**2 + Y**2
-        psi12 = 2 * X * Y 
-        return self["mass"] * np.array(((Y**2 - X**2, psi12),(psi12, X**2 - Y**2))) / r2**2
-        
-    @coordinate_shift
-    def potential(self, X, Y):
-        return self["mass"] * np.log(np.sqrt(X**2 + Y**2))
-
 class ImagePotential_Lens(BaseLens):
     default_params = {"norm": 1.}
 

@@ -12,10 +12,17 @@ def coordinate_shift(func):
     return wrap_coordinate_shift
 def coordinate_rotate(func):
     @functools.wraps(func)
-    def wrap_coordinate_shift(self, X, Y, *args, **kwargs):
-        XX, YY = Rotate_Cartesian(X, Y, self["pa"])
+    def wrap_coordinate_rotate(self, X, Y, *args, **kwargs):
+        XX, YY = Rotate_Cartesian(X, Y, -self["pa"])
         return func(self, XX, YY, *args, **kwargs)
-    return wrap_coordinate_shift
+    return wrap_coordinate_rotate
+def coordinate_rotate_rev(func):
+    @functools.wraps(func)
+    def wrap_coordinate_rotate_rev(self, X, Y, *args, **kwargs):
+        XX, YY = Rotate_Cartesian(X, Y, -self["pa"])
+        fX, fY = func(self, XX, YY, *args, **kwargs)
+        return Rotate_Cartesian(fX, fY, self["pa"])
+    return wrap_coordinate_rotate_rev
 
 def coordinate_transform(func):
     @functools.wraps(func)

@@ -27,12 +27,13 @@ class Sersic_Source(BaseSource):
 class Image_Source(BaseSource):
     default_params = {"norm": 1.}
     
-    def __init__(self, image, pixelscale = None, fov = None, **kwargs):
+    def __init__(self, image, pixelscale = None, fov = None, fill = None, **kwargs):
         super().__init__(**kwargs)
         assert (fov is not None) or (pixelscale is not None), "one of fov or pixelscale must be given"
         self.image = image
         self._image_sampler = None
-
+        self.fill = fill
+        
         self.pixel_sum = np.sum(self.image)
         self.shape = np.array(self.image.shape)
         if fov is not None:
@@ -71,5 +72,9 @@ class Image_Source(BaseSource):
     def __call__(self, X, Y):
         if self._image_sampler is None:
             self._image_sampler = RectBivariateSpline(self.grid[0],self.grid[1],self.image)
-        return self["norm"] * self._image_sampler(X, Y, grid = False)
+
+        samples = self._image_sampler(X, Y, grid = False)
+        if self.fill is not None:
+            samples[np.logical_not(np.logical_and((-self.fov[0]/2 < X) * (self.fov[0]/2 > X), (-self.fov[1]/2 < Y) * (self.fov[1]/2 > Y)))] = self.fill
+        return self["norm"] * samples
     

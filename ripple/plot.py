@@ -1,8 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from matplotlib.colors import ListedColormap
 
 def critical_lines(lensplane, ax, show = True, resolution = 1000, fov = 2., **kwargs):
+    print("fov", fov)
     if isinstance(resolution, int):
         resolution = (resolution, resolution)
     if isinstance(fov, float):
@@ -65,7 +67,7 @@ def lens_potential(lensplane, ax, fov = (10,10), shape = (1000,1000), **kwargs):
     ax.set_title("Lens Potential")
     ax.imshow(lensplane.potential(XX, YY), extent = (-fov[0]/2, fov[0]/2, -fov[1]/2, fov[1]/2), origin = "lower", **kwargs)
 
-def lens_alpha(lensplane, ax1, ax2, fov = (10,10), shape = (1000,1000), **kwargs):
+def lens_alpha(lensplane, ax1, ax2, fov = (10,10), shape = (1000,1000), ax3 = None, **kwargs):
 
     pixelscale = np.array(fov) / np.array(shape)
     XX, YY = np.meshgrid(
@@ -78,8 +80,11 @@ def lens_alpha(lensplane, ax1, ax2, fov = (10,10), shape = (1000,1000), **kwargs
     ax1.imshow(alpha[0], extent = (-fov[0]/2, fov[0]/2, -fov[1]/2, fov[1]/2), origin = "lower", **kwargs)
     ax2.set_title("Lens Alpha$_1$")
     ax2.imshow(alpha[1], extent = (-fov[0]/2, fov[0]/2, -fov[1]/2, fov[1]/2), origin = "lower", **kwargs)
+    if not ax3 is None:
+        ax3.set_title("Lens |Alpha|")
+        ax3.imshow(np.sqrt(alpha[0]**2 + alpha[1]**2), extent = (-fov[0]/2, fov[0]/2, -fov[1]/2, fov[1]/2), origin = "lower", **kwargs)
 
-def lens_gamma(lensplane, ax1, ax2, fov = (10,10), shape = (1000,1000), **kwargs):
+def lens_gamma(lensplane, ax1, ax2, fov = (10,10), shape = (1000,1000), ax3 = None, **kwargs):
     
     pixelscale = np.array(fov) / np.array(shape)
     XX, YY = np.meshgrid(
@@ -87,16 +92,20 @@ def lens_gamma(lensplane, ax1, ax2, fov = (10,10), shape = (1000,1000), **kwargs
         (np.arange(shape[1]) - (shape[1]-1)/2)*pixelscale[1]
     )
 
-    gamma = np.arctan(lensplane.gamma(XX, YY))
+    gamma = lensplane.gamma(XX, YY)
+    atgamma = np.arctan(gamma)
     kwargs["cmap"] = kwargs.get("cmap", "seismic")
-    gamma_extreme = max(np.max(gamma), abs(np.min(gamma)))
-    kwargs["vmin"] = kwargs.get("vmin", -gamma_extreme)
-    kwargs["vmax"] = kwargs.get("vmax",  gamma_extreme)
+    atgamma_extreme = max(np.max(atgamma), abs(np.min(atgamma)))
+    kwargs["vmin"] = kwargs.get("vmin", -atgamma_extreme)
+    kwargs["vmax"] = kwargs.get("vmax",  atgamma_extreme)
     
     ax1.set_title("Lens Gamma$_0$ (arctan)")
-    ax1.imshow(gamma[0], extent = (-fov[0]/2, fov[0]/2, -fov[1]/2, fov[1]/2), origin = "lower", **kwargs)
+    ax1.imshow(atgamma[0], extent = (-fov[0]/2, fov[0]/2, -fov[1]/2, fov[1]/2), origin = "lower", **kwargs)
     ax2.set_title("Lens Gamma$_1$ (arctan)")
-    ax2.imshow(gamma[1], extent = (-fov[0]/2, fov[0]/2, -fov[1]/2, fov[1]/2), origin = "lower", **kwargs)
+    ax2.imshow(atgamma[1], extent = (-fov[0]/2, fov[0]/2, -fov[1]/2, fov[1]/2), origin = "lower", **kwargs)
+    if not ax3 is None:
+        ax3.set_title("Lens log|Gamma|")
+        ax3.imshow(np.log10(np.sqrt(gamma[0]**2 + gamma[1]**2)), extent = (-fov[0]/2, fov[0]/2, -fov[1]/2, fov[1]/2), origin = "lower", **kwargs)
 
 def source_distribution(sourceplane, ax, fov = (10,10), shape = (1000,1000), **kwargs):
 
@@ -168,11 +177,14 @@ def rays_3D(imageplane, lensplane, sourceplane, ax3d, units = "angular", Nrays =
 
     return samplesX, samplesY, finalX, finalY
 
-def rays_3D_multiplane(imageplane, multilensplane, sourceplane, ax3d, units = "angular", Nrays = 25, samples = None, cmap = None, view_init = (20,-20), surface_kwargs = {}, ray_kwargs = {}):
+def rays_3D_multiplane(imageplane, multilensplane, sourceplane, ax3d, units = "angular", Nrays = 25, lens_display = "kappa", samples = None, cmap = None, view_init = (20,-20), surface_kwargs = {}, ray_kwargs = {}):
 
     ax3d.set_title("Rays")
 
     image = imageplane.image(multilensplane, sourceplane)
+
+    if cmap is None:
+        cmap = mpl.cm.inferno
 
     # sample rays using image as probability distribution
     if samples is None:
@@ -192,15 +204,13 @@ def rays_3D_multiplane(imageplane, multilensplane, sourceplane, ax3d, units = "a
     DAimage = 0. if units == "physical" else 1.
     DAsource = imageplane.dA(0, sourceplane.z) if units == "physical" else 1.
 
-    surface_kwargs["rcount"] = surface_kwargs.get("rcount", 100)
-    surface_kwargs["ccount"] = surface_kwargs.get("ccount", 100)
+    surface_kwargs["rcount"] = surface_kwargs.get("rcount", 300)
+    surface_kwargs["ccount"] = surface_kwargs.get("ccount", 300)
     tmpalpha = surface_kwargs.get("alpha", 0.1)
-    surface_kwargs["alpha"] = 1. #surface_kwargs.get("alpha", 0.3)
-
-    if cmap is None:
-        cmap = mpl.cm.inferno
+    surface_kwargs["alpha"] = 1.
 
     face_forward = (view_init[1] % 360) > 180
+    
     # Plot the image plane
     if units == "angular":
         ax3d.plot_surface(
@@ -208,22 +218,42 @@ def rays_3D_multiplane(imageplane, multilensplane, sourceplane, ax3d, units = "a
             facecolors = cmap(image/np.max(image)), zorder = (2 + 2*len(multilensplane)) if face_forward else 0, **surface_kwargs
         )
     
-    surface_kwargs["alpha"] = tmpalpha
+    del surface_kwargs["alpha"]
+    mod_cmap = cmap(np.arange(cmap.N))
+    clarity = np.ones(cmap.N) * tmpalpha #np.linspace(0, 1, cmap.N)
+    clarity[0] = 0
+    #clarity = np.sqrt(clarity)
+    mod_cmap[:, -1] = clarity
+    mod_cmap = ListedColormap(mod_cmap)
+    #surface_kwargs["alpha"] = tmpalpha
     # Plot the source plane
     source = sourceplane(imageplane.XX, imageplane.YY)
     ax3d.plot_surface(
         imageplane.XX*DAsource, np.zeros(image.shape)+Dsource, imageplane.YY*DAsource,
-        facecolors = cmap(source/np.max(source)), zorder = 0 if face_forward else (2 + 2*len(multilensplane)), **surface_kwargs
+        facecolors = mod_cmap(source/np.max(source)), zorder = 0 if face_forward else (2 + 2*len(multilensplane)), **surface_kwargs
     )
+
+    surface_kwargs["rcount"] = 200 #surface_kwargs.get("rcount", 200)
+    surface_kwargs["ccount"] = 200 #surface_kwargs.get("ccount", 200)
+    my_cmap = cmap(np.arange(cmap.N))
+    clarity = np.linspace(0, 1, cmap.N)
+    clarity[clarity < 0.2] = 0
+    #clarity = np.sqrt(clarity)
+    my_cmap[:, -1] = clarity
+    my_cmap = ListedColormap(my_cmap)
 
     for ilp, lensplane in enumerate(multilensplane):
         # Plot the lens plane
         Dlens = imageplane.dM(0, lensplane.z)
         DAlens = imageplane.dA(0, lensplane.z) if units == "physical" else 1.
-        kappa = lensplane.kappa(imageplane.XX, imageplane.YY)
+        if lens_display == "kappa":
+            lens_repr = np.log10(lensplane.kappa(imageplane.XX, imageplane.YY))
+        elif lens_display == "potential":
+            lens_repr = -lensplane.potential(imageplane.XX, imageplane.YY)
+        lens_repr -= np.min(lens_repr[np.isfinite(lens_repr)])
         ax3d.plot_surface(
             imageplane.XX*DAlens, np.zeros(image.shape)+Dlens, imageplane.YY*DAlens,
-            facecolors = cmap(kappa/np.max(kappa)), zorder = (2*len(multilensplane) - 2*ilp) if face_forward else (2 + 2*ilp), **surface_kwargs
+            facecolors = my_cmap(lens_repr/np.max(lens_repr)), zorder = (2*len(multilensplane) - 2*ilp) if face_forward else (2 + 2*ilp), **surface_kwargs
         )
 
     alphas = multilensplane.alpha_recursive(0., multilensplane.dM(imageplane.z, multilensplane.planes[0].z) * np.array([samplesX, samplesY]), imageplane, sourceplane, alphas = [])
